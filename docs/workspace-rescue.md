@@ -10,7 +10,7 @@ DSH 的 `~/.dsh/storages/workspace.json` 是强 schema 存储，启动时整份�
 
 ## 第 0 步：只读诊断（不改任何文件）
 
-1. 找 DSH home：默认 `C:\Users\<你>\.dsh`（或环境变量 `DSH_HOME`）。
+1. 找 DSH home：默认 `~/.dsh`（或环境变量 `DSH_HOME`）。
 2. 用 Node 只读检查（Windows PowerShell 直接跑）：
 
    ```powershell

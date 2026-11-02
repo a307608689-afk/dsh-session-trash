@@ -2,9 +2,39 @@
 
 > DSH 会话回收站 —— 让「删除会话」变成可撤销的操作。
 
-[DSH (DeepSeek Harness)](https://github.com/deepseek-ai) 默认删除会话是直接从工作区列表里摘掉，误删之后只能去磁盘上翻目录。这个插件把删除改成两步：先移进回收站，保留期内随时可以恢复，到期自动清理。
+**License** MIT · **Node** ≥ 20 · **依赖** 零第三方依赖 · **网络** 纯本地，无出站连接
 
-> **非官方插件**：本项目由社区开发者维护，不是 DeepSeek 官方项目，与 DeepSeek 官方无隶属关系。
+[DSH (DeepSeek Harness)](https://github.com/deepseek-ai) 默认删除会话是直接从工作区列表里摘掉，误删之后只能去磁盘上翻目录。这个插件把删除改成两步：**先移进回收站，保留期内随时可以恢复，到期自动清理**。
+
+> **非官方插件**：本项目由社区开发者维护，不是 DeepSeek 官方项目，与 DeepSeek 官方无隶属关系。完整免责条款见 [DISCLAIMER.md](DISCLAIMER.md)。
+
+## 它解决什么问题
+
+DSH 里「会话」不是一个数据库行，而是磁盘上的一个目录：
+
+```
+~/.dsh/sessions/<工作区目录名>/<sessionId>/session.v4.jsonl.zstd
+```
+
+哪个会话属于哪个工作区，记在 `~/.dsh/storages/workspace.json` 的名单里。原生删除只做「从名单里摘掉 + 删目录」，没有回收站，也没有撤销。
+
+这带来三个实际问题：
+
+1. **手滑即永久丢失** —— 删除没有二次确认和留档，误删就只能靠时间机器 / 文件恢复工具；
+2. **不知道删掉了什么** —— 删除前看不到会话多大、有没有附件、是不是正在运行；
+3. **删完侧栏还挂着** —— 内存里的工作区快照没刷新，界面上还看得到，点进去报错。
+
+这个插件针对性地做了三件事：**回收站（可恢复）、删除前分析（知道在删什么）、留档（留一手证据）**，另外补了孤儿目录清理、退出自检、崩溃自愈这些运维向能力。
+
+## 截图
+
+| 删除入口 | 删除前分析 |
+|---|---|
+| ![会话列表](docs/screenshots/01-session-list.png) | ![删除确认](docs/screenshots/02-session-menu.png) |
+| **回收站** | **批量操作** |
+| ![回收站](docs/screenshots/04-trash.png) | ![批量删除](docs/screenshots/05-bulk-delete.png) |
+| **附件明细** | **彻底删除** |
+| ![附件明细](docs/screenshots/06-attach-detail.png) | ![彻底删除](docs/screenshots/07-purge-dialog.png) |
 
 ## 功能
 
@@ -64,6 +94,25 @@ curl -X POST http://127.0.0.1:<端口>/dsh-session-trash/config \
 
 `autoPurgeMinutes` 可设 5–1440，`0` 表示关闭自动清理。
 
+## 实现方式
+
+> 细节见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+
+插件分两半：
+
+| 部分 | 文件 | 做什么 |
+|---|---|---|
+| 宿主半端 | `index.js` | 路由、存储、删除 / 恢复 / 留档 / 清理逻辑 |
+| 浏览器半端 | `client.js` | 会话菜单、删除确认框、设置页「回收站」 |
+| 共享工具 | `lib/path-safety.mjs`、`lib/tree.mjs` | 路径边界、目录统计（纯函数，可单测） |
+
+关键设计：
+
+- **删除 = 搬目录 + 摘名单**：不碰 `session.v4.jsonl.zstd` 内容，原始文件永远能拿回来；
+- **唯一写入口**：所有对 `workspace.json` 的写入都走 `writeWorkspaceDoc()` —— 字段校验 → 版本戳复核 → 原子写 → 回读校验，任一步不通过就抛错，**一个字节都不写**；
+- **并发不静默降级**：进程内串行 + 跨进程锁目录，拿不到锁明确返回 `TRASH_BUSY`，不假装成功；
+- **留档带校验**：zstd + sha256，还原前先验哈希，包内路径逐条过越界检查。
+
 ## 数据与隐私
 
 **这是一个纯本地插件，不会向任何外部服务器发送数据。**
@@ -80,6 +129,29 @@ curl -X POST http://127.0.0.1:<端口>/dsh-session-trash/config \
 会被改写的宿主文件只有 `~/.dsh/storages/workspace.json`，而且所有写入都走唯一入口 `writeWorkspaceDoc()`：结构校验 → 备份 → 原子写 → 回读比对，任一步不通过就回滚。
 
 **诊断包**（设置 → 回收站 → 安全 → 导出诊断包）**不含对话正文**，只有健康状态、条目摘要、留档摘要和最近 200 条 journal，可以直接发给帮忙排查的人。
+
+## 安全性
+
+| 检查项 | 结论 |
+|---|---|
+| 外部网络请求 | **无**。前端只请求同源 `/dsh-session-trash/*`，服务端无任何出站连接 |
+| 第三方依赖 | **无**。`package.json` 没有 `dependencies` / `devDependencies`，只用 Node 内置模块 |
+| 动态代码执行 | **无** `eval` / `new Function` / 由用户输入驱动的动态 `import` |
+| 路径穿越 | `pathInside()` + `safeJoinInside()` 双重校验，拒绝绝对路径、盘符、`..` 逃逸 |
+| 输入校验 | 所有 POST body 逐字段判类型；保留期只接受 7/30/90，自动清理间隔限 5–1440 |
+| 权限 | 只读写 `DSH_HOME` 下的目录，不需要管理员 / root |
+| 敏感信息 | 仓库内无 token、密码、私钥、邮箱、手机号；本机路径已全部替换为环境变量或相对路径 |
+| 数据外发 | 无。诊断包在本地生成，是否发出去由你自己决定 |
+
+自测命令（想自己验一遍的话）：
+
+```bash
+# 语法检查
+node --check index.js && node --check client.js && node --check selftest.mjs
+
+# 单测：路径越界、盘符、..、目录统计与复制比对
+npm test
+```
 
 ## HTTP 接口
 
@@ -192,6 +264,12 @@ node test/integration.mjs
 
 见 [docs/CHANGELOG.md](docs/CHANGELOG.md)。
 
+## 免责声明
+
+本插件会**真实移动和删除**你磁盘上的会话目录，并改写 `~/.dsh/storages/workspace.json`。**彻底删除不可撤销**。请在使用前自行备份，或先在测试环境验证。
+
+本软件按「现状」提供，不附带任何担保；作者不对数据丢失、工作区损坏、业务中断等后果承担责任。完整条款见 **[DISCLAIMER.md](DISCLAIMER.md)**。
+
 ## 许可证
 
-[MIT](LICENSE)
+[MIT](LICENSE) © 2026 a307608689-afk
