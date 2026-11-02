@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "title": "Trash",
+    "description": "Deleted sessions go to the trash first and can be restored within 30 days"
+  },
+  "sidebar.workspaces.session.menu.item": {
+    "session-trash-delete": "Delete session"
+  },
+  "settings.section": {
+    "session-trash": "Trash"
+  }
+}

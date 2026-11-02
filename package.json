@@ -1,0 +1,58 @@
+{
+  "name": "dsh-session-trash",
+  "version": "0.1.7",
+  "type": "module",
+  "description": "DSH 会话回收站：删除会话、可恢复、文件留档（DeepSeek Harness 插件）",
+  "license": "MIT",
+  "author": "a307608689-afk",
+  "homepage": "https://github.com/a307608689-afk/dsh-session-trash#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a307608689-afk/dsh-session-trash.git"
+  },
+  "bugs": {
+    "url": "https://github.com/a307608689-afk/dsh-session-trash/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "session",
+    "trash",
+    "recycle-bin"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/path-safety.test.mjs test/tree.test.mjs",
+    "selftest": "node selftest.mjs",
+    "integration": "node test/integration.mjs"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "lib",
+    "client.js",
+    "locale",
+    "icon.svg",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  }
+}

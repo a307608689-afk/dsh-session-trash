@@ -1,0 +1,28 @@
+# 依赖 / 构建产物
+node_modules/
+dist/
+*.tsbuildinfo
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 本地环境与日志
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# DSH 本地产物
+.dsh/
+*.local
+
+# 测试 / 自测产生的临时数据
+test/.tmp/
+coverage/

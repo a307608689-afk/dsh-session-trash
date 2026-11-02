@@ -1,0 +1,12 @@
+{
+  "meta": {
+    "title": "回收站",
+    "description": "删除的会话先进回收站，30 天内可以找回"
+  },
+  "sidebar.workspaces.session.menu.item": {
+    "session-trash-delete": "删除会话"
+  },
+  "settings.section": {
+    "session-trash": "回收站"
+  }
+}
